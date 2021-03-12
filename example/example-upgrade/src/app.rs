@@ -17,8 +17,8 @@ use rlink_example_utils::unbounded_input_format::RandInputFormat;
 use rlink_example_utils::buffer_gen::model::FIELD_TYPE;
 use rlink_example_utils::buffer_gen::model;
 
-use crate::config_input_format::{SinkConfigInputFormat, get_config};
-use crate::config_connect::{ConfigCoProcessFunction, ConfigResponse};
+use crate::config_connect::ConfigCoProcessFunction;
+use crate::config_input_format::{KafkaSinkConfParam, init_sink_context, KafkaSinkContext, KafkaSinkConfInputFormat};
 
 #[derive(Clone, Debug)]
 pub struct UpgradeStreamApp {
@@ -37,25 +37,15 @@ impl StreamApp for UpgradeStreamApp {
     fn prepare_properties(&self, properties: &mut Properties) {
         properties.set_keyed_state_backend(KeyedStateBackend::Memory);
         properties.set_pub_sub_channel_size(100000);
-        match get_config(self.config_url.as_str(), self.application_name.as_str()) {
-            Ok(resp) => {
-                let response: ConfigResponse = serde_json::from_str(resp.as_str()).unwrap();
-                info!("sink config response={:?}", response);
-                properties.set_str("expression", response.result.expression.as_str());
-                properties.set_str("topic_true", response.result.topic_true.as_str());
-                properties.set_str("topic_false", response.result.topic_false.as_str());
-            }
-            Err(e) => {
-                error!("get sink config error. {}", e);
-                panic!("get sink config error")
-            }
-        }
+
+        let kafka_sink_conf_param = KafkaSinkConfParam::new(self.config_url.clone(), self.application_name.clone());
+        let kafka_sink_context = init_sink_context(&kafka_sink_conf_param).unwrap_or(KafkaSinkContext::new());
+        properties.set_str("sink_context", serde_json::to_string(&kafka_sink_context).unwrap().as_str());
     }
 
     fn build_stream(&self, properties: &Properties, env: &mut StreamExecutionEnvironment) {
-        let expression = properties.get_string("expression").unwrap();
-        let topic_true = properties.get_string("topic_true").unwrap();
-        let topic_false = properties.get_string("topic_false").unwrap();
+        let context_str = properties.get_string("sink_context").unwrap();
+        let sink_context: KafkaSinkContext = serde_json::from_str(context_str.as_str()).unwrap();
 
         let key_selector = SchemaBaseKeySelector::new(vec![model::index::name], &FIELD_TYPE);
         let reduce_function =
@@ -82,8 +72,9 @@ impl StreamApp for UpgradeStreamApp {
                 SchemaBaseTimestampAssigner::new(model::index::timestamp, &FIELD_TYPE),
             ));
 
+        let kafka_sink_conf_param = KafkaSinkConfParam::new(self.config_url.clone(), self.application_name.clone());
         let config_stream = env
-            .register_source(SinkConfigInputFormat::new(self.application_name.clone(), self.config_url.clone()), 1)
+            .register_source(KafkaSinkConfInputFormat::new(kafka_sink_conf_param.clone()), 1)
             .flat_map(BroadcastFlagMapFunction::new());
 
         data_stream.key_by(key_selector)
@@ -94,8 +85,8 @@ impl StreamApp for UpgradeStreamApp {
             ))
             .reduce(reduce_function, 2)
             .connect(vec![CoStream::from(config_stream)],
-                     ConfigCoProcessFunction::new(expression, topic_true, topic_false,
-                                                  output_schema_types.as_slice()))
+                     ConfigCoProcessFunction::new(
+                         output_schema_types.as_slice(), sink_context, kafka_sink_conf_param))
             .add_sink(kafka_output_format);
     }
 }

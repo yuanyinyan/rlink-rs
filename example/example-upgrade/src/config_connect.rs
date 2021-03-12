@@ -1,31 +1,28 @@
-use rhai::{Engine, Scope};
+use rhai::Scope;
 
 use rlink::api::function::{CoProcessFunction, Context};
 use rlink::api::element::Record;
 use rlink::api::window::TWindow;
 use rlink::api;
 use rlink::utils::date_time;
-use rlink_kafka_connector::build_kafka_record;
-use rlink_example_utils::buffer_gen::config;
+use rlink_kafka_connector::{build_kafka_record};
+use crate::config_input_format::{KafkaSinkContext, KafkaSinkConfParam, KafkaSinkUtil, parse_sink_context};
 
 #[derive(Debug, Function)]
 pub struct ConfigCoProcessFunction {
-    // sink条件表达式
-    expression: String,
-    // 表达式为true时，sink topic
-    topic_true: String,
-    // 表达式为false时，sink topic
-    topic_false: String,
+    sink_context: KafkaSinkContext,
+    sink_conf_param: KafkaSinkConfParam,
+    sink_util: KafkaSinkUtil,
     field_types: Vec<u8>,
     counter: u64,
 }
 
 impl ConfigCoProcessFunction {
-    pub fn new(expression: String, topic_true: String, topic_false: String, field_types: &[u8]) -> Self {
+    pub fn new(field_types: &[u8], sink_context: KafkaSinkContext, sink_conf_param: KafkaSinkConfParam) -> Self {
         ConfigCoProcessFunction {
-            expression,
-            topic_true,
-            topic_false,
+            sink_context,
+            sink_conf_param,
+            sink_util: KafkaSinkUtil::new(),
             field_types: field_types.to_vec(),
             counter: 0,
         }
@@ -49,11 +46,9 @@ impl CoProcessFunction for ConfigCoProcessFunction {
         };
         let json = serde_json::to_string(&data).unwrap();
 
-        let sink_topic = get_sink_topic(
-            data,
-            self.expression.as_str(),
-            self.topic_true.as_str(),
-            self.topic_false.as_str());
+        let mut scope = Scope::new();
+        scope.push("timestamp", data.timestamp as i64);
+        let sink_topic = self.sink_util.get_sink_topic(scope, &self.sink_context);
 
         info!("==>:{},topic={}", json, sink_topic);
 
@@ -71,73 +66,20 @@ impl CoProcessFunction for ConfigCoProcessFunction {
         Box::new(vec![kafka_record].into_iter())
     }
 
-    fn process_right(&mut self, stream_seq: usize, mut record: Record) -> Box<dyn Iterator<Item=Record>> {
-        match config::Entity::parse(record.as_buffer()) {
-            Ok(conf) => {
-                info!(
-                    "Config Stream: {}, config [field:{}, val:{}]",
-                    stream_seq, conf.field, conf.value
-                );
-                let config_data: ConfigData = serde_json::from_str(conf.value.as_str()).unwrap();
-                self.expression = config_data.expression;
-                self.topic_true = config_data.topic_true;
-                self.topic_false = config_data.topic_false;
+    fn process_right(&mut self, stream_seq: usize, record: Record) -> Box<dyn Iterator<Item=Record>> {
+        match parse_sink_context(record) {
+            Some(sink_context) => {
+                info!("parse sink config:stream_seq={},value={:?}", stream_seq, sink_context.clone());
+                self.sink_context = sink_context;
             }
-            Err(e) => {
-                error!("parse config error!{}", e)
-            }
-        };
+            None => error!("parse sink config error!"),
+        }
         Box::new(vec![].into_iter())
     }
 
     fn close(&mut self) -> api::Result<()> {
         Ok(())
     }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ConfigResponse {
-    code: i32,
-    #[serde(default)]
-    message: String,
-    pub(crate) result: ConfigData,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ConfigData {
-    #[serde(rename = "applicationName")]
-    app_name: String,
-    // sink条件表达式
-    #[serde(rename = "expression")]
-    pub(crate) expression: String,
-    // 表达式为true时，sink topic
-    #[serde(rename = "topicTrue")]
-    pub(crate) topic_true: String,
-    // 表达式为false时，sink topic
-    #[serde(rename = "topicFalse")]
-    pub(crate) topic_false: String,
-}
-
-fn get_sink_topic(data: SinkDataModel, expression: &str, topic_true: &str, topic_false: &str) -> String {
-    let engine = Engine::new();
-    let mut scope = Scope::new();
-    scope.push("timestamp", data.timestamp as i64);
-    scope.push("name", data.name);
-    scope.push("sum", data.sum);
-
-    return match engine.eval_expression_with_scope(&mut scope, expression) {
-        Ok(result) => {
-            if result {
-                topic_true.to_string()
-            } else {
-                topic_false.to_string()
-            }
-        }
-        Err(e) => {
-            error!("eval sink expression error. {}", e);
-            "".to_string()
-        }
-    };
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -160,14 +102,14 @@ mod tests {
     #[test]
     pub fn test() {
         let engine = Engine::new();
-        let mut scope = Scope::new();
-        let timestamp = 1615356257239 as i64;
-        let compare = 1615356257000 as i64;
-        scope.push("timestamp", timestamp);
 
         for _ in 0..10 {
             let start = utils::date_time::current_timestamp().as_secs();
             for _ in 0..100000 {
+                let mut scope = Scope::new();
+                let timestamp = 1615356257239 as i64;
+                // let compare = 1615356257000 as i64;
+                scope.push("timestamp", timestamp);
                 let _result: bool = engine.eval_expression_with_scope(&mut scope, "timestamp>1615356257000").unwrap();
             }
             let end = utils::date_time::current_timestamp().as_secs();
