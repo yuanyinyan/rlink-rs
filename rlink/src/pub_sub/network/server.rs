@@ -257,7 +257,7 @@ impl Server {
                 len, channel_key, end_response
             );
         }
-        self.send(end_response, framed_write).await;
+        self.send(end_response, framed_write).await?;
         framed_write.flush().await
     }
 
