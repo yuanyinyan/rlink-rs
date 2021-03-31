@@ -251,12 +251,15 @@ impl Server {
             ElementResponse::end(ResponseCode::Empty)
         };
 
+        let code = end_response.code.clone();
+
         self.send(end_response, framed_write).await?;
         framed_write.flush().await?;
+
         if is_enable_log() {
             info!(
                 "try recv empty, total recv size {}, channel_key: {:?}, response: {:?}",
-                len, channel_key, end_response.code.clone()
+                len, channel_key, code
             );
         }
         Ok(())
