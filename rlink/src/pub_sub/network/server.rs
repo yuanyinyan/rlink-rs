@@ -256,7 +256,7 @@ impl Server {
         if is_enable_log() {
             info!(
                 "try recv empty, total recv size {}, channel_key: {:?}, response: {:?}",
-                len, channel_key, end_response
+                len, channel_key, end_response.code.clone()
             );
         }
         Ok(())
