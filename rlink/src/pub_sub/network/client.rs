@@ -268,6 +268,7 @@ impl Client {
 
             let buffer: BytesMut = request.into();
             framed_write.send(buffer.freeze()).await?;
+            framed_write.flush().await?;
 
             let element_list = Self::recv_element(
                 codec_framed.borrow_mut(),

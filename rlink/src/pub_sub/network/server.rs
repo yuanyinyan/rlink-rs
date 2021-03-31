@@ -257,7 +257,8 @@ impl Server {
                 len, channel_key, end_response
             );
         }
-        self.send(end_response, framed_write).await
+        self.send(end_response, framed_write).await;
+        framed_write.flush().await
     }
 
     fn batch_get(&self, channel_key: &ChannelKey, batch_pull_size: u16) -> LinkedList<Element> {
