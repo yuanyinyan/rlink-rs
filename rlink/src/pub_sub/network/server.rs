@@ -251,14 +251,15 @@ impl Server {
             ElementResponse::end(ResponseCode::Empty)
         };
 
+        self.send(end_response, framed_write).await?;
+        framed_write.flush().await?;
         if is_enable_log() {
             info!(
                 "try recv empty, total recv size {}, channel_key: {:?}, response: {:?}",
                 len, channel_key, end_response
             );
         }
-        self.send(end_response, framed_write).await?;
-        framed_write.flush().await
+        Ok(())
     }
 
     fn batch_get(&self, channel_key: &ChannelKey, batch_pull_size: u16) -> LinkedList<Element> {
