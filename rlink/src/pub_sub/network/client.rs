@@ -269,7 +269,6 @@ impl Client {
 
             let buffer: BytesMut = request.into();
             framed_write.send(buffer.freeze()).await?;
-            framed_write.flush().await?;
 
             let element_list = tokio::time::timeout(
                 timeout,
