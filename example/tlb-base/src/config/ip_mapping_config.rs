@@ -21,15 +21,14 @@ pub fn load_ip_mapping_task(url: &str) {
     // 每天凌晨4点取全量IpMapping数据
     let now = current_timestamp().as_secs();
     let period = 24 * 60 * 60;
-    let diff = (now / period + 1) * period + 4 * 60 * 60 - now;
+    let diff = (now / period + 1) * period - 4 * 60 * 60 - now;
     let start = Instant::now() + std::time::Duration::from_secs(diff);
 
     std::thread::spawn(move || {
         tokio::runtime::Runtime::new().unwrap().block_on(async {
+            let mut interval = tokio::time::interval_at(start, std::time::Duration::from_secs(period));
             loop {
-                tokio::time::interval_at(start, std::time::Duration::from_secs(period))
-                    .tick()
-                    .await;
+                interval.tick().await;
 
                 load_remote_ip_mapping(url.as_str()).await;
             }
