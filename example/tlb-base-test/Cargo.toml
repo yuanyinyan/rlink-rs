@@ -1,0 +1,45 @@
+[package]
+name = "tlb-base-test"
+version = "0.1.0"
+authors = ["袁殷 <2212079150@qq.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies.rlink]
+version = "0.2"
+path = "../../rlink"
+
+[dependencies.rlink-derive]
+version = "0.2"
+path = "../../rlink-derive"
+
+[dependencies.rlink-kafka-connector]
+version = "0.2"
+path = "../../rlink-connectors/kafka-connector"
+
+[dependencies]
+#rlink = "0.2"
+#rlink-derive = "0.2"
+#rlink-kafka-connector= "0.2"
+
+serbuffer = "1.1"
+
+log = "0.4.8"
+
+serde = "1.0"
+serde_derive = "1.0"
+serde_json = "1.0"
+
+chrono="0.4"
+
+## net
+tokio = { version = "0.2", features = ["full"] }
+
+csv = "1.1"
+lazy_static = "1.4.0"
+dashmap = "3.11"
+hyper = "0.13"
+
+[build-dependencies]
+serbuffer-gen = "1.0"
