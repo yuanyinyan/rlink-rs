@@ -4,26 +4,32 @@ use rlink_kafka_connector::KafkaRecord;
 use std::borrow::BorrowMut;
 
 use crate::buffer_gen::tlb_base::Entity;
-use crate::config::ip_mapping_config::{
-    get_ip_mapping_config, load_ip_mapping_task, IpMappingItem,
-};
+// use crate::config::ip_mapping_config::{
+//     get_ip_mapping_config, load_ip_mapping_task, IpMappingItem,
+// };
 use crate::config::url_rule_config::{get_url_rule_config, load_url_rule_task};
 use crate::utils::date_time;
 use serde_json::Value;
 use std::convert::TryFrom;
 use std::error::Error;
+use std::collections::HashMap;
+use std::fs::File;
 
 #[derive(Debug, Function)]
 pub struct TlbKafkaMapFunction {
     url_rule_conf_url: String,
     ip_mapping_url: String,
+    naming_config_path: String,
+    naming_map: HashMap<String, Vec<String>>,
 }
 
 impl TlbKafkaMapFunction {
-    pub fn new(url_rule_conf_url: String, ip_mapping_url: String) -> Self {
+    pub fn new(url_rule_conf_url: String, ip_mapping_url: String, naming_config_path: String) -> Self {
         TlbKafkaMapFunction {
             url_rule_conf_url,
             ip_mapping_url,
+            naming_config_path,
+            naming_map: HashMap::new(),
         }
     }
 }
@@ -31,7 +37,8 @@ impl TlbKafkaMapFunction {
 impl FlatMapFunction for TlbKafkaMapFunction {
     fn open(&mut self, _context: &Context) -> rlink::api::Result<()> {
         load_url_rule_task(self.url_rule_conf_url.as_str());
-        load_ip_mapping_task(self.ip_mapping_url.as_str());
+        // load_ip_mapping_task(self.ip_mapping_url.as_str());
+        self.naming_map = load_naming_map(self.naming_config_path.as_str()).unwrap_or_default();
         Ok(())
     }
 
@@ -51,12 +58,12 @@ impl FlatMapFunction for TlbKafkaMapFunction {
                 return Box::new(records.into_iter());
             }
         };
-        let record_new = match parse_data(line.as_str()) {
+        let record_new = match parse_data(&self.naming_map, line.as_str()) {
             Ok(record_new) => record_new,
             Err(_e) => {
-                if !_e.to_string().eq("st format error") && !_e.to_string().eq("not test appuk") {
-                    error!("parse data error,{},{:?}", _e, line);
-                }
+                // if !_e.to_string().eq("st format error") && !_e.to_string().eq("not test appuk") {
+                //     error!("parse data error,{},{:?}", _e, line);
+                // }
                 return Box::new(records.into_iter());
             }
         };
@@ -70,7 +77,7 @@ impl FlatMapFunction for TlbKafkaMapFunction {
     }
 }
 
-fn parse_data(line: &str) -> Result<Record, Box<dyn Error>> {
+fn parse_data(naming_map: &HashMap<String, Vec<String>>, line: &str) -> Result<Record, Box<dyn Error>> {
     let mut timestamp = 0;
     let mut status = String::new();
     let mut host = String::new();
@@ -82,8 +89,8 @@ fn parse_data(line: &str) -> Result<Record, Box<dyn Error>> {
     let mut response_time = 0;
     let mut bytes_recv = 0;
     let mut bytes_send = 0;
-    let mut client_ip = String::new();
-    let mut server_ip = String::new();
+    // let mut client_ip = String::new();
+    // let mut server_ip = String::new();
     let data_source = "tlb".to_string();
 
     let json: Value = serde_json::from_str(line)?;
@@ -99,7 +106,7 @@ fn parse_data(line: &str) -> Result<Record, Box<dyn Error>> {
         let value = field.get(index + 1..).unwrap_or("");
         match key {
             "st" => timestamp = parse_st(value)?,
-            "ip" => client_ip = value.to_string(),
+            // "ip" => client_ip = value.to_string(),
             "status" => status = value.to_string(),
             "host" => host = value.to_string(),
             "request_method" => request_method = value.to_string(),
@@ -120,8 +127,8 @@ fn parse_data(line: &str) -> Result<Record, Box<dyn Error>> {
             "upstream_name" => upstream_name = value.to_string(),
             "up_addr" => {
                 up_addr = value.to_string();
-                let ip_index = up_addr.find(":").unwrap_or(up_addr.len());
-                server_ip = up_addr.get(..ip_index).unwrap_or("").to_string();
+                // let ip_index = up_addr.find(":").unwrap_or(up_addr.len());
+                // server_ip = up_addr.get(..ip_index).unwrap_or("").to_string();
             }
             "bytes_recv" => bytes_recv = value.parse::<i64>().unwrap_or(0),
             "bytes_send" => bytes_send = value.parse::<i64>().unwrap_or(0),
@@ -132,8 +139,35 @@ fn parse_data(line: &str) -> Result<Record, Box<dyn Error>> {
         return Err(Box::try_from("st format error").unwrap());
     }
 
-    let client_info = parse_ip_mapping(client_ip.as_str())?;
-    let sever_info = parse_ip_mapping(server_ip.as_str())?;
+    // upstream_name, tcbase_dsf_apigateway.sz.product_logicidc_hd1
+    if !upstream_name.contains("_") {
+        return Err(Box::try_from("upstream_name format error").unwrap());
+    }
+    let first_index = upstream_name.find(".").unwrap_or(0);
+    let last_index = upstream_name.rfind(".").unwrap_or(0);
+    if first_index == last_index {
+        return Err(Box::try_from("upstream_name format error").unwrap());
+    }
+    let mut app_id = match naming_map.get(upstream_name.as_str()) {
+        Some(app_uk_arr) => match app_uk_arr.get(0) {
+            Some(app_uk) => app_uk.clone(),
+            None => String::new()
+        },
+        None => String::new()
+    };
+    if app_id.is_empty() {
+        app_id = upstream_name.get(0..first_index).unwrap_or("").replace("_", ".");
+    }
+    let region = upstream_name.get(first_index + 1..last_index).unwrap_or("");
+    let env_idc = upstream_name.get(last_index + 1..).unwrap_or("");
+    let env = upstream_name.get(last_index + 1..last_index + 1 + env_idc.find("_").unwrap_or(0)).unwrap_or("");
+    let logical_idc = upstream_name.get(last_index + 1 + env_idc.find("_").unwrap_or(0) + 1..).unwrap_or("");
+    if app_id.eq("") || region.eq("") || env.eq("") || logical_idc.eq("") {
+        return Err(Box::try_from("upstream_name format error").unwrap());
+    }
+
+    // let client_info = parse_ip_mapping(client_ip.as_str())?;
+    // let sever_info = parse_ip_mapping(server_ip.as_str())?;
 
     // test
     // if !sever_info.app_uk.eq("dssteamyyjk.java.skyeye.url.monitor")
@@ -141,7 +175,7 @@ fn parse_data(line: &str) -> Result<Record, Box<dyn Error>> {
     //     return Err(Box::try_from("not test appuk").unwrap());
     // }
 
-    let (request_uri, is_rule) = format_url(sever_info.app_uk.as_str(), request_uri.to_string())?;
+    let (request_uri, is_rule) = format_url(app_id.as_str(), request_uri.to_string())?;
 
     let (
         bytes_recv_1k,
@@ -170,18 +204,18 @@ fn parse_data(line: &str) -> Result<Record, Box<dyn Error>> {
 
     let entity = Entity {
         timestamp,
-        app_id: sever_info.app_uk,
-        client_app_uk: client_info.app_uk,
-        region: sever_info.area_uk.unwrap_or(String::new()),
-        env: sever_info.group_environment.unwrap_or(String::new()),
-        logical_idc: sever_info.logical_idc_uk.unwrap_or(String::new()),
+        app_id,
+        client_app_uk: "".to_string(),
+        region: region.to_string(),
+        env: env.to_string(),
+        logical_idc: logical_idc.to_string(),
         status,
         host,
         request_method,
         request_uri,
         up_addr,
         is_rule,
-        upstream_name,
+        upstream_name: upstream_name.clone(),
         data_source,
         bytes_recv_sum: bytes_recv,
         bytes_recv_1k,
@@ -226,6 +260,13 @@ fn parse_data(line: &str) -> Result<Record, Box<dyn Error>> {
     Ok(record_new)
 }
 
+fn load_naming_map(naming_config_path: &str) -> Result<HashMap<String, Vec<String>>, Box<dyn Error>> {
+    let file = File::open(naming_config_path)?;
+    let value: HashMap<String, Vec<String>> = serde_json::from_reader(file)?;
+    info!("load naming map size={}", value.len());
+    Ok(value)
+}
+
 fn parse_st(st: &str) -> Result<u64, Box<dyn Error>> {
     let mut format = "%Y-%m-%d %H:%M:%S";
     if st.contains("T") {
@@ -236,21 +277,21 @@ fn parse_st(st: &str) -> Result<u64, Box<dyn Error>> {
     Ok(timestamp as u64)
 }
 
-fn parse_ip_mapping(ip: &str) -> Result<IpMappingItem, Box<dyn Error>> {
-    if ip.is_empty() {
-        return Ok(IpMappingItem::new());
-    }
-    match get_ip_mapping_config(ip) {
-        Some(conf) => {
-            let item = (*conf).clone();
-            Ok(item)
-        }
-        None => {
-            // warn!("get ip mapping conf error,ip={}", ip);
-            Ok(IpMappingItem::new())
-        }
-    }
-}
+// fn parse_ip_mapping(ip: &str) -> Result<IpMappingItem, Box<dyn Error>> {
+//     if ip.is_empty() {
+//         return Ok(IpMappingItem::new());
+//     }
+//     match get_ip_mapping_config(ip) {
+//         Some(conf) => {
+//             let item = (*conf).clone();
+//             Ok(item)
+//         }
+//         None => {
+//             // warn!("get ip mapping conf error,ip={}", ip);
+//             Ok(IpMappingItem::new())
+//         }
+//     }
+// }
 
 fn format_url(app_id: &str, mut request_uri: String) -> Result<(String, bool), Box<dyn Error>> {
     let mut is_rule = false;

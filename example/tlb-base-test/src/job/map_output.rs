@@ -105,7 +105,7 @@ impl FlatMapFunction for KafkaOutputMapFunction {
         };
         let json = serde_json::to_string(&data).unwrap();
 
-        info!("==>:{}", json);
+        // info!("==>:{}", json);
 
         if self.counter & 1048575 == 1 {
             info!(
