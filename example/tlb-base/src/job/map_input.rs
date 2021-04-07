@@ -35,7 +35,7 @@ impl FlatMapFunction for TlbKafkaMapFunction {
         Ok(())
     }
 
-    fn flat_map(&mut self, mut record: Record) -> Box<dyn Iterator<Item = Record>> {
+    fn flat_map(&mut self, mut record: Record) -> Box<dyn Iterator<Item=Record>> {
         let mut records = Vec::new();
 
         let mut kafka_record = KafkaRecord::new(record.borrow_mut());
@@ -54,7 +54,9 @@ impl FlatMapFunction for TlbKafkaMapFunction {
         let record_new = match parse_data(line.as_str()) {
             Ok(record_new) => record_new,
             Err(_e) => {
-                // error!("parse data error,{},{:?}", _e, line);
+                if !_e.to_string().eq("st format error") && !_e.to_string().eq("not test appuk") {
+                    error!("parse data error,{},{:?}", _e, line);
+                }
                 return Box::new(records.into_iter());
             }
         };
@@ -127,11 +129,16 @@ fn parse_data(line: &str) -> Result<Record, Box<dyn Error>> {
         }
     }
     if timestamp == 0 {
-        return Err(Box::try_from("upstream_name format error").unwrap());
+        return Err(Box::try_from("st format error").unwrap());
     }
 
     let client_info = parse_ip_mapping(client_ip.as_str())?;
     let sever_info = parse_ip_mapping(server_ip.as_str())?;
+
+    // test
+    if !sever_info.app_uk.eq("dssteamyyjk.java.skyeye.url.monitor") {
+        return Err(Box::try_from("not test appuk").unwrap());
+    }
 
     let (request_uri, is_rule) = format_url(sever_info.app_uk.as_str(), request_uri.to_string())?;
 
