@@ -19,9 +19,9 @@ edition = "2018"
 #path = "../../rlink-connectors/kafka-connector"
 
 [dependencies]
-rlink = "=0.2.2"
-rlink-derive = "=0.2.2"
-rlink-kafka-connector= "=0.2.2"
+rlink = "=0.2.3"
+rlink-derive = "=0.2.3"
+rlink-kafka-connector= "=0.2.3"
 
 serbuffer = "1.1"
 
