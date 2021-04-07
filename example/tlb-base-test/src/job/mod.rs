@@ -24,10 +24,10 @@ use std::collections::HashMap;
 use std::time::Duration;
 use crate::job::map_output::KafkaOutputMapFunction;
 
-mod ip_mapping_connect;
+// mod ip_mapping_connect;
 mod map_input;
 pub mod percentile;
-mod sink_conf_connect;
+// mod sink_conf_connect;
 mod map_output;
 
 const KAFKA_TOPIC_QA_SOURCE: &str = "logant_nginx_access_log";

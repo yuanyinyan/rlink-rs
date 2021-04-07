@@ -6,22 +6,22 @@ edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[dependencies.rlink]
-version = "0.2"
-path = "../../rlink"
-
-[dependencies.rlink-derive]
-version = "0.2"
-path = "../../rlink-derive"
-
-[dependencies.rlink-kafka-connector]
-version = "0.2"
-path = "../../rlink-connectors/kafka-connector"
+#[dependencies.rlink]
+#version = "0.2"
+#path = "../../rlink"
+#
+#[dependencies.rlink-derive]
+#version = "0.2"
+#path = "../../rlink-derive"
+#
+#[dependencies.rlink-kafka-connector]
+#version = "0.2"
+#path = "../../rlink-connectors/kafka-connector"
 
 [dependencies]
-#rlink = "0.2"
-#rlink-derive = "0.2"
-#rlink-kafka-connector= "0.2"
+rlink = "=0.2.2"
+rlink-derive = "=0.2.2"
+rlink-kafka-connector= "=0.2.2"
 
 serbuffer = "1.1"
 
