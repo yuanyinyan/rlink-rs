@@ -4,7 +4,7 @@ use crate::job::ip_mapping_connect::IpMappingCoProcessFunction;
 use crate::job::map_input::TlbKafkaMapFunction;
 use crate::job::percentile::get_percentile_scale;
 use crate::job::sink_conf_connect::SinkConfCoProcessFunction;
-use rlink::api::backend::{KeyedStateBackend, /*CheckpointBackend*/};
+use rlink::api::backend::{KeyedStateBackend, CheckpointBackend};
 use rlink::api::data_stream::{
     CoStream, TConnectedStreams, TDataStream, TKeyedStream, TWindowedStream,
 };
@@ -102,24 +102,24 @@ impl StreamApp for KafkaStreamJob {
         properties.set_str("url_rule_conf_url", self.url_rule_conf_url.as_str());
         properties.set_str("ip_mapping_url", self.ip_mapping_url.as_str());
 
-        let _checkpoint_endpoint;
-        let _checkpoint_table;
+        let checkpoint_endpoint;
+        let checkpoint_table;
         if self.env.eq("product") {
             properties.set_str("kafka_topic_source", KAFKA_TOPIC_PRODUCT_SOURCE);
             properties.set_str("kafka_broker_servers_source", KAFKA_BROKERS_PRODUCT_SOURCE);
             properties.set_str("kafka_broker_servers_sink", KAFKA_BROKERS_PRODUCT_SINK);
             properties.set_str("ip_mapping_kafka_topic", IP_MAPPING_KAFKA_TOPIC_PRODUCT);
             properties.set_str("ip_mapping_kafka_servers", IP_MAPPING_KAFKA_SERVERS_PRODUCT);
-            _checkpoint_endpoint = CHECKPOINT_ENDPOINT_PRODUCT;
-            _checkpoint_table = CHECKPOINT_TABLE_PRODUCT;
+            checkpoint_endpoint = CHECKPOINT_ENDPOINT_PRODUCT;
+            checkpoint_table = CHECKPOINT_TABLE_PRODUCT;
         } else {
             properties.set_str("kafka_topic_source", KAFKA_TOPIC_QA_SOURCE);
             properties.set_str("kafka_broker_servers_source", KAFKA_BROKERS_QA_SOURCE);
             properties.set_str("kafka_broker_servers_sink", KAFKA_BROKERS_QA_SINK);
             properties.set_str("ip_mapping_kafka_topic", IP_MAPPING_KAFKA_TOPIC_QA);
             properties.set_str("ip_mapping_kafka_servers", IP_MAPPING_KAFKA_SERVERS_QA);
-            _checkpoint_endpoint = CHECKPOINT_ENDPOINT_QA;
-            _checkpoint_table = CHECKPOINT_TABLE_QA;
+            checkpoint_endpoint = CHECKPOINT_ENDPOINT_QA;
+            checkpoint_table = CHECKPOINT_TABLE_QA;
         };
 
         properties.set_str("kafka_topic_source", self.topic.as_str());
@@ -130,11 +130,11 @@ impl StreamApp for KafkaStreamJob {
         properties.set_str("application_name", self.application_name.as_str());
         properties.set_str("sink_conf_url", self.sink_conf_url.as_str());
 
-        // properties.set_checkpoint_internal(Duration::from_secs(30));
-        // properties.set_checkpoint(CheckpointBackend::MySql {
-        //     endpoint: checkpoint_endpoint.to_string(),
-        //     table: Some(checkpoint_table.to_string()),
-        // });
+        properties.set_checkpoint_internal(Duration::from_secs(30));
+        properties.set_checkpoint(CheckpointBackend::MySql {
+            endpoint: checkpoint_endpoint.to_string(),
+            table: Some(checkpoint_table.to_string()),
+        });
     }
 
     fn build_stream(&self, properties: &Properties, env: &mut StreamExecutionEnvironment) {
