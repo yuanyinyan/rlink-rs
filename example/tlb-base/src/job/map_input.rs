@@ -136,7 +136,8 @@ fn parse_data(line: &str) -> Result<Record, Box<dyn Error>> {
     let sever_info = parse_ip_mapping(server_ip.as_str())?;
 
     // test
-    if !sever_info.app_uk.eq("dssteamyyjk.java.skyeye.url.monitor") {
+    if !sever_info.app_uk.eq("dssteamyyjk.java.skyeye.url.monitor")
+        && !sever_info.app_uk.eq("dssteamyycz.java.escloud.skyeye") {
         return Err(Box::try_from("not test appuk").unwrap());
     }
 
