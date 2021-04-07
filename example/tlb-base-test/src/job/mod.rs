@@ -1,18 +1,18 @@
 use crate::buffer_gen::tlb_base::{index, FIELD_TYPE};
-use crate::config::sink_config::{KafkaSinkConfInputFormat, KafkaSinkConfParam};
+// use crate::config::sink_config::{KafkaSinkConfInputFormat, KafkaSinkConfParam};
 // use crate::job::ip_mapping_connect::IpMappingCoProcessFunction;
 use crate::job::map_input::TlbKafkaMapFunction;
 use crate::job::percentile::get_percentile_scale;
-use crate::job::sink_conf_connect::SinkConfCoProcessFunction;
+// use crate::job::sink_conf_connect::SinkConfCoProcessFunction;
 use rlink::api::backend::{KeyedStateBackend, /*CheckpointBackend*/};
 use rlink::api::data_stream::{
-    CoStream, TConnectedStreams, TDataStream, TKeyedStream, TWindowedStream,
+    /*CoStream, TConnectedStreams, */TDataStream, TKeyedStream, TWindowedStream,
 };
 use rlink::api::env::{StreamApp, StreamExecutionEnvironment};
 use rlink::api::properties::{Properties, SystemProperties};
 use rlink::api::watermark::BoundedOutOfOrdernessTimestampExtractor;
 use rlink::api::window::SlidingEventTimeWindows;
-use rlink::functions::broadcast_flat_map::BroadcastFlagMapFunction;
+// use rlink::functions::broadcast_flat_map::BroadcastFlagMapFunction;
 use rlink::functions::schema_base::key_selector::SchemaBaseKeySelector;
 use rlink::functions::schema_base::reduce::{pct_u64, sum_i64, SchemaBaseReduceFunction};
 use rlink::functions::schema_base::timestamp_assigner::SchemaBaseTimestampAssigner;
@@ -22,20 +22,22 @@ use rlink_kafka_connector::{
 };
 use std::collections::HashMap;
 use std::time::Duration;
+use crate::job::map_output::KafkaOutputMapFunction;
 
 mod ip_mapping_connect;
 mod map_input;
 pub mod percentile;
 mod sink_conf_connect;
+mod map_output;
 
 const KAFKA_TOPIC_QA_SOURCE: &str = "logant_nginx_access_log";
 const KAFKA_BROKERS_QA_SOURCE: &str = "10.100.172.41:9092,10.100.172.42:9092,10.100.172.43:9092";
-// const KAFKA_TOPIC_QA_SINK: &str = "duty_ops_topic_core_tlb_base_qa";
+const KAFKA_TOPIC_QA_SINK: &str = "duty_ops_topic_core_tlb_base_qa";
 const KAFKA_BROKERS_QA_SINK: &str = "10.100.172.41:9092,10.100.172.42:9092,10.100.172.43:9092";
 
 const KAFKA_TOPIC_PRODUCT_SOURCE: &str = "logant_nginx_access_log";
 const KAFKA_BROKERS_PRODUCT_SOURCE: &str = "kafka.ops.17usoft.com:9092";
-// const KAFKA_TOPIC_PRODUCT_SINK: &str = "duty_ops_topic_core_tlb_base";
+const KAFKA_TOPIC_PRODUCT_SINK: &str = "duty_ops_topic_core_tlb_base_verify";
 const KAFKA_BROKERS_PRODUCT_SINK: &str = "sz.kafka.dss.17usoft.com:9092";
 
 const IP_MAPPING_KAFKA_TOPIC_QA: &str = "infra_ip_appuk_mapping_topic_qa";
@@ -107,6 +109,7 @@ impl StreamApp for KafkaStreamJob {
         if self.env.eq("product") {
             properties.set_str("kafka_topic_source", KAFKA_TOPIC_PRODUCT_SOURCE);
             properties.set_str("kafka_broker_servers_source", KAFKA_BROKERS_PRODUCT_SOURCE);
+            properties.set_str("kafka_topic_sink", KAFKA_TOPIC_PRODUCT_SINK);
             properties.set_str("kafka_broker_servers_sink", KAFKA_BROKERS_PRODUCT_SINK);
             properties.set_str("ip_mapping_kafka_topic", IP_MAPPING_KAFKA_TOPIC_PRODUCT);
             properties.set_str("ip_mapping_kafka_servers", IP_MAPPING_KAFKA_SERVERS_PRODUCT);
@@ -115,6 +118,7 @@ impl StreamApp for KafkaStreamJob {
         } else {
             properties.set_str("kafka_topic_source", KAFKA_TOPIC_QA_SOURCE);
             properties.set_str("kafka_broker_servers_source", KAFKA_BROKERS_QA_SOURCE);
+            properties.set_str("kafka_topic_sink", KAFKA_TOPIC_QA_SINK);
             properties.set_str("kafka_broker_servers_sink", KAFKA_BROKERS_QA_SINK);
             properties.set_str("ip_mapping_kafka_topic", IP_MAPPING_KAFKA_TOPIC_QA);
             properties.set_str("ip_mapping_kafka_servers", IP_MAPPING_KAFKA_SERVERS_QA);
@@ -138,8 +142,8 @@ impl StreamApp for KafkaStreamJob {
     }
 
     fn build_stream(&self, properties: &Properties, env: &mut StreamExecutionEnvironment) {
-        let application_name = properties.get_string("application_name").unwrap();
-        let sink_conf_url = properties.get_string("sink_conf_url").unwrap();
+        // let application_name = properties.get_string("application_name").unwrap();
+        // let sink_conf_url = properties.get_string("sink_conf_url").unwrap();
 
         let url_rule_conf_url = properties.get_string("url_rule_conf_url").unwrap();
         let ip_mapping_url = properties.get_string("ip_mapping_url").unwrap();
@@ -149,6 +153,7 @@ impl StreamApp for KafkaStreamJob {
             .unwrap();
         let kafka_topic_source = properties.get_string("kafka_topic_source").unwrap();
         let kafka_servers_sink = properties.get_string("kafka_broker_servers_sink").unwrap();
+        let kafka_topic_sink = properties.get_string("kafka_topic_sink").unwrap();
         let source_parallelism = properties.get_u32("source_parallelism").unwrap();
         let reduce_parallelism = properties.get_u32("reduce_parallelism").unwrap();
         let group_id = properties.get_string("kafka_group_id").unwrap();
@@ -234,7 +239,7 @@ impl StreamApp for KafkaStreamJob {
         let kafka_output_format = {
             let mut conf_map = HashMap::new();
             conf_map.insert(BOOTSTRAP_SERVERS.to_string(), kafka_servers_sink);
-            create_output_format(conf_map, None, Some(50000))
+            create_output_format(conf_map, Some(kafka_topic_sink), Some(50000))
         };
 
         // let ip_mapping_input_format = {
@@ -255,12 +260,12 @@ impl StreamApp for KafkaStreamJob {
         // let ip_mapping_stream = env
         //     .register_source(ip_mapping_input_format, 1)
         //     .flat_map(BroadcastFlagMapFunction::new());
-
-        let sink_conf_param = KafkaSinkConfParam::new(sink_conf_url, application_name);
-
-        let config_stream = env
-            .register_source(KafkaSinkConfInputFormat::new(sink_conf_param.clone()), 1)
-            .flat_map(BroadcastFlagMapFunction::new());
+        //
+        // let sink_conf_param = KafkaSinkConfParam::new(sink_conf_url, application_name);
+        //
+        // let config_stream = env
+        //     .register_source(KafkaSinkConfInputFormat::new(sink_conf_param.clone()), 1)
+        //     .flat_map(BroadcastFlagMapFunction::new());
 
         data_stream
             // .connect(
@@ -274,10 +279,11 @@ impl StreamApp for KafkaStreamJob {
                 None,
             ))
             .reduce(reduce_function, reduce_parallelism as u16)
-            .connect(
-                vec![CoStream::from(config_stream)],
-                SinkConfCoProcessFunction::new(sink_conf_param, output_schema_types.as_slice()),
-            )
+            // .connect(
+            //     vec![CoStream::from(config_stream)],
+            //     SinkConfCoProcessFunction::new(sink_conf_param, output_schema_types.as_slice()),
+            // )
+            .flat_map(KafkaOutputMapFunction::new(output_schema_types))
             .add_sink(kafka_output_format);
     }
 }
