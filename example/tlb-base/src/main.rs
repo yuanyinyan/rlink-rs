@@ -22,12 +22,12 @@ fn main() {
     let env = parse_arg("env").unwrap_or("qa".to_string()).to_string();
 
     let source_parallelism = {
-        let n = parse_arg("source_parallelism").unwrap_or("1".to_string());
+        let n = parse_arg("source_parallelism").unwrap_or("2".to_string());
         u32::from_str(n.as_str()).unwrap()
     };
 
     let reduce_parallelism = {
-        let n = parse_arg("reduce_parallelism").unwrap_or("1".to_string());
+        let n = parse_arg("reduce_parallelism").unwrap_or("2".to_string());
         u32::from_str(n.as_str()).unwrap()
     };
 

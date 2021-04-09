@@ -1,53 +1,53 @@
-use crate::config::sink_config::{/*KafkaSinkConfParam, */SinkConfig};
-// use crate::job::percentile::get_percentile_scale;
-use rlink::api;
+use crate::job::percentile::get_percentile_scale;
+use rlink::api::function::{FlatMapFunction, Context};
 use rlink::api::element::Record;
-use rlink::api::function::{CoProcessFunction, Context};
-use rlink::api::window::TWindow;
+use rlink::api;
 use rlink::functions::percentile::Percentile;
-use rlink::utils::date_time;
+use rlink::api::window::TWindow;
 use rlink::utils::date_time::timestamp_str;
 use rlink_kafka_connector::build_kafka_record;
+use rlink::utils::date_time;
 use std::collections::HashMap;
+use rlink_sink_conf::sink_config::{init_sink_config, get_sink_topic};
 
 #[derive(Debug, Function)]
-pub struct SinkConfCoProcessFunction {
-    sink_config: SinkConfig,
-    field_types: Vec<u8>,
+pub struct KafkaOutputMapFunction {
+    sink_conf_url: String,
+    application_name: String,
+    data_type: Vec<u8>,
+    counter: u64,
     id_prefix: String,
     scala: &'static [f64],
-    counter: u64,
 }
 
-impl SinkConfCoProcessFunction {
-    // pub fn new(sink_conf_param: KafkaSinkConfParam, field_types: &[u8]) -> Self {
-    //     SinkConfCoProcessFunction {
-    //         sink_config: SinkConfig::new(sink_conf_param),
-    //         field_types: field_types.to_vec(),
-    //         id_prefix: "".to_string(),
-    //         scala: get_percentile_scale(),
-    //         counter: 0,
-    //     }
-    // }
+impl KafkaOutputMapFunction {
+    pub fn new(sink_conf_url: String, application_name: String, data_type: Vec<u8>) -> Self {
+        KafkaOutputMapFunction {
+            sink_conf_url,
+            application_name,
+            data_type,
+            counter: 0,
+            id_prefix: "".to_string(),
+            scala: get_percentile_scale(),
+        }
+    }
 }
 
-impl CoProcessFunction for SinkConfCoProcessFunction {
+impl FlatMapFunction for KafkaOutputMapFunction {
     fn open(&mut self, context: &Context) -> api::Result<()> {
-        self.id_prefix = format!(
-            "{}-{}",
-            context.task_id.task_number(),
-            rlink::utils::date_time::current_timestamp().as_secs()
-        );
-        self.sink_config.init_sink_config();
+        self.id_prefix = format!("{}-{}",
+                                 context.task_id.task_number(),
+                                 rlink::utils::date_time::current_timestamp().as_secs());
+        init_sink_config(self.sink_conf_url.clone(), self.application_name.clone());
         Ok(())
     }
 
-    fn process_left(&mut self, mut record: Record) -> Box<dyn Iterator<Item = Record>> {
+    fn flat_map(&mut self, mut record: Record) -> Box<dyn Iterator<Item=Record>> {
         self.counter += 1;
         let id = format!("{}-{}", self.id_prefix, self.counter);
 
         let window = record.trigger_window().unwrap();
-        let mut reader = record.as_reader(self.field_types.as_slice());
+        let mut reader = record.as_reader(self.data_type.as_slice());
 
         let percentile_buffer = reader.get_bytes_mut(49).unwrap();
         let percentile = Percentile::new(self.scala, percentile_buffer);
@@ -113,9 +113,9 @@ impl CoProcessFunction for SinkConfCoProcessFunction {
 
         let mut expression_param = HashMap::new();
         expression_param.insert("timestamp".to_string(), data.timestamp.to_string());
-        let sink_topic = self.sink_config.get_sink_topic(expression_param);
+        let sink_topic = get_sink_topic(expression_param);
 
-        // info!("==>:{},topic={}", json, sink_topic);
+        // info!("==>:{}", json);
 
         if self.counter & 1048575 == 1 {
             info!(
@@ -136,18 +136,9 @@ impl CoProcessFunction for SinkConfCoProcessFunction {
             0, // ignore
             0, // ignore
         )
-        .unwrap();
+            .unwrap();
 
         Box::new(vec![kafka_record].into_iter())
-    }
-
-    fn process_right(
-        &mut self,
-        _stream_seq: usize,
-        record: Record,
-    ) -> Box<dyn Iterator<Item = Record>> {
-        self.sink_config.update_sink_config(record);
-        Box::new(vec![].into_iter())
     }
 
     fn close(&mut self) -> api::Result<()> {

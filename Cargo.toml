@@ -17,5 +17,4 @@ members = [
     "example/example-files",
     "example/tlb-base",
     "example/tlb-detail",
-    "example/tlb-base-test",
 ]

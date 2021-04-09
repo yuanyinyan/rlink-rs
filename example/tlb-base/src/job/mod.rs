@@ -1,9 +1,7 @@
 use crate::buffer_gen::tlb_base::{index, FIELD_TYPE};
-use crate::config::sink_config::{KafkaSinkConfInputFormat, KafkaSinkConfParam};
 use crate::job::ip_mapping_connect::IpMappingCoProcessFunction;
 use crate::job::map_input::TlbKafkaMapFunction;
 use crate::job::percentile::get_percentile_scale;
-use crate::job::sink_conf_connect::SinkConfCoProcessFunction;
 use rlink::api::backend::{KeyedStateBackend, CheckpointBackend};
 use rlink::api::data_stream::{
     CoStream, TConnectedStreams, TDataStream, TKeyedStream, TWindowedStream,
@@ -22,11 +20,12 @@ use rlink_kafka_connector::{
 };
 use std::collections::HashMap;
 use std::time::Duration;
+use crate::job::map_output::KafkaOutputMapFunction;
 
 mod ip_mapping_connect;
 mod map_input;
 pub mod percentile;
-mod sink_conf_connect;
+pub mod map_output;
 
 const KAFKA_TOPIC_QA_SOURCE: &str = "logant_nginx_access_log";
 const KAFKA_BROKERS_QA_SOURCE: &str = "10.100.172.41:9092,10.100.172.42:9092,10.100.172.43:9092";
@@ -256,12 +255,6 @@ impl StreamApp for KafkaStreamJob {
             .register_source(ip_mapping_input_format, 1)
             .flat_map(BroadcastFlagMapFunction::new());
 
-        let sink_conf_param = KafkaSinkConfParam::new(sink_conf_url, application_name);
-
-        let config_stream = env
-            .register_source(KafkaSinkConfInputFormat::new(sink_conf_param.clone()), 1)
-            .flat_map(BroadcastFlagMapFunction::new());
-
         data_stream
             .connect(
                 vec![CoStream::from(ip_mapping_stream)],
@@ -274,10 +267,7 @@ impl StreamApp for KafkaStreamJob {
                 None,
             ))
             .reduce(reduce_function, reduce_parallelism as u16)
-            .connect(
-                vec![CoStream::from(config_stream)],
-                SinkConfCoProcessFunction::new(sink_conf_param, output_schema_types.as_slice()),
-            )
+            .flat_map(KafkaOutputMapFunction::new(sink_conf_url, application_name, output_schema_types))
             .add_sink(kafka_output_format);
     }
 }

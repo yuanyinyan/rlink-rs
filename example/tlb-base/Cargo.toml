@@ -41,5 +41,7 @@ lazy_static = "1.4.0"
 dashmap = "3.11"
 hyper = "0.13"
 
+rlink-sink-conf = "0.1"
+
 [build-dependencies]
 serbuffer-gen = "1.0"
