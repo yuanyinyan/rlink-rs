@@ -136,11 +136,11 @@ fn parse_data(line: &str) -> Result<Record, Box<dyn Error>> {
     let sever_info = parse_ip_mapping(server_ip.as_str())?;
 
     // test
-    if !request_uri.eq("/flightactivities/newAuth/blindbox/index") {
-        return Err(Box::try_from("not test appuk").unwrap());
-    } else {
-        info!("test line = {}", line);
-    }
+    // if !request_uri.eq("/flightactivities/newAuth/blindbox/index") {
+    //     return Err(Box::try_from("not test appuk").unwrap());
+    // } else {
+    //     info!("test line = {}", line);
+    // }
 
     let (request_uri, is_rule) = format_url(sever_info.app_uk.as_str(), request_uri.to_string())?;
 
