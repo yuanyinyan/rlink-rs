@@ -87,11 +87,11 @@ fn parse_data(line: &str) -> Result<Record, Box<dyn Error>> {
     let data_source = "tlb".to_string();
 
     // test
-    if !line.find("/flightactivities/newAuth/blindbox/index").is_some() {
-        return Err(Box::try_from("not test appuk").unwrap());
-    } else {
-        info!("test line = {}", line);
-    }
+    // if !line.find("/flightactivities/newAuth/blindbox/index").is_some() {
+    //     return Err(Box::try_from("not test appuk").unwrap());
+    // } else {
+    //     info!("test line = {}", line);
+    // }
 
     let json: Value = serde_json::from_str(line)?;
     let json_map = json.as_object().ok_or("log is not json")?;
