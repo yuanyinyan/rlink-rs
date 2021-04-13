@@ -1,6 +1,7 @@
 mod map_input;
 mod map_output;
 pub mod percentile;
+mod ip_mapping_connect;
 
 use crate::job::map_input::TlbKafkaMapFunction;
 use std::collections::HashMap;
@@ -21,7 +22,7 @@ use rlink::functions::schema_base::timestamp_assigner::SchemaBaseTimestampAssign
 use rlink::functions::broadcast_flat_map::BroadcastFlagMapFunction;
 use rlink::api::window::SlidingEventTimeWindows;
 use rlink::functions::schema_base::FunctionSchema;
-use cmdb_ip_mapping::ip_mapping_connect::IpMappingCoProcessFunction;
+use crate::job::ip_mapping_connect::IpMappingCoProcessFunction;
 
 const KAFKA_TOPIC_QA_SOURCE: &str = "efe-logs";
 const KAFKA_BROKERS_QA_SOURCE: &str = "10.100.172.41:9092,10.100.172.42:9092,10.100.172.43:9092";
