@@ -1,7 +1,6 @@
 use hyper::body::Buf;
 use hyper::{Body, Client, Request};
 
-pub mod ip_mapping_config;
 pub mod url_rule_config;
 
 pub async fn get(url: &str) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {

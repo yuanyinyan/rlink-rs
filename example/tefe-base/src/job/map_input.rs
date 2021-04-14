@@ -59,7 +59,7 @@ fn parse_data(line: &str) -> Result<Record, Box<dyn Error>> {
     let json: Value = serde_json::from_str(line)?;
 
     let timestamp = json["log-ts"].as_u64().unwrap_or(0);
-    let mut app_id = parse_app_id(json["us_name"].as_str().unwrap_or(""))?;
+    let app_id = parse_app_id(json["us_name"].as_str().unwrap_or(""))?;
     let client_ip = json["client_ip"].as_str().unwrap_or("").to_string();
     let region = json["region"].as_str().unwrap_or("").to_string();
     let env = json["us_env"].as_str().unwrap_or("").to_string();
@@ -71,6 +71,7 @@ fn parse_data(line: &str) -> Result<Record, Box<dyn Error>> {
     let up_addr = json["us_addr"].as_str().unwrap_or("").to_string();
     let ip_index = up_addr.find(":").unwrap_or(up_addr.len());
     let server_ip = up_addr.get(..ip_index).unwrap_or("").to_string();
+    let server_port = up_addr.get(ip_index + 1..).unwrap_or("");
     let is_rule = false;
     let upstream_name = json["us_name"].as_str().unwrap_or("").to_string();
     let data_source = "tefe".to_string();
@@ -80,11 +81,8 @@ fn parse_data(line: &str) -> Result<Record, Box<dyn Error>> {
     let request_time = json["request_time"].as_i64().unwrap_or(0);
     let response_time = json["us_response_time"].as_i64().unwrap_or(0);
 
-    let client_info = parse_ip_mapping(client_ip.as_str())?;
-    let sever_info = parse_ip_mapping(server_ip.as_str())?;
-    if !sever_info.app_uk.is_empty() {
-        app_id = sever_info.app_uk;
-    }
+    let (client_info, _) = parse_ip_mapping(client_ip.as_str(), "")?;
+    let (sever_info, app_uk_parse_type) = parse_ip_mapping(server_ip.as_str(), server_port)?;
 
     let (bytes_recv_1k, bytes_recv_4k, bytes_recv_16k, bytes_recv_64k,
         bytes_recv_256k, bytes_recv_1m, bytes_recv_3m, bytes_recv_more) =
@@ -100,8 +98,8 @@ fn parse_data(line: &str) -> Result<Record, Box<dyn Error>> {
 
     let entity = Entity {
         timestamp,
-        app_id,
-        client_app_uk: client_info.app_uk,
+        app_id: sever_info.app_uk.unwrap_or(app_id),
+        client_app_uk: client_info.app_uk.unwrap_or_default(),
         region: sever_info.area_uk.unwrap_or(region),
         env: sever_info.group_environment.unwrap_or(env),
         logical_idc: sever_info.logical_idc_uk.unwrap_or(logical_idc),
@@ -113,6 +111,7 @@ fn parse_data(line: &str) -> Result<Record, Box<dyn Error>> {
         is_rule,
         upstream_name,
         data_source,
+        app_uk_parse_type: format!("{:?}", app_uk_parse_type),
         bytes_recv_sum: bytes_recv,
         bytes_recv_1k,
         bytes_recv_4k,
@@ -167,20 +166,26 @@ fn parse_logical_idc(us_env: &str) -> Result<String, Box<dyn Error>> {
     Ok(logical_idc.to_string())
 }
 
-fn parse_ip_mapping(ip: &str) -> Result<IpMappingItem, Box<dyn Error>> {
+fn parse_ip_mapping(ip: &str, port: &str) -> Result<(IpMappingItem, AppUkParseType), Box<dyn Error>> {
     if ip.is_empty() {
-        return Ok(IpMappingItem::new());
+        return Ok((IpMappingItem::new(), AppUkParseType::UpstreamName));
     }
-    match get_ip_mapping_config(ip) {
-        Some(conf) => {
-            let item = (*conf).clone();
-            Ok(item)
+    let ip_mapping_items = get_ip_mapping_config(ip);
+    if ip_mapping_items.len() == 1 || port.is_empty() {
+        for item in ip_mapping_items {
+            if item.primary_ip.clone().unwrap_or_default().eq(ip) {
+                return Ok((item, AppUkParseType::PrimaryIp));
+            }
         }
-        None => {
-            // warn!("get ip mapping conf error,ip={}", ip);
-            Ok(IpMappingItem::new())
+    } else {
+        for item in ip_mapping_items {
+            if item.other_ip.clone().unwrap_or_default().eq(ip) &&
+                item.port.clone().unwrap_or_default().eq(port) {
+                return Ok((item, AppUkParseType::OtherIp));
+            }
         }
     }
+    Ok((IpMappingItem::new(), AppUkParseType::UpstreamName))
 }
 
 fn parse_bytes_size(bytes_size: i64) -> Result<(i64, i64, i64, i64, i64, i64, i64, i64), Box<dyn Error>> {
@@ -261,4 +266,11 @@ fn parse_status(status: &str, response_time: i64) -> Result<(i64, i64, i64, i64,
         time_5xx = response_time;
     }
     Ok((sum_2xx, sum_3xx, sum_4xx, sum_5xx, time_2xx, time_3xx, time_4xx, time_5xx))
+}
+
+#[derive(Debug)]
+enum AppUkParseType {
+    UpstreamName,
+    PrimaryIp,
+    OtherIp,
 }

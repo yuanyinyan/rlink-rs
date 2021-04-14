@@ -42,6 +42,7 @@ dashmap = "3.11"
 hyper = "0.13"
 
 rlink-sink-conf = "0.1"
+cmdb-ip-mapping = "0.1"
 
 [build-dependencies]
 serbuffer-gen = "1.0"

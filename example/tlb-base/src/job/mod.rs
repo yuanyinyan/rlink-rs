@@ -63,6 +63,7 @@ pub struct KafkaStreamJob {
     sink_conf_url: String,
     url_rule_conf_url: String,
     ip_mapping_url: String,
+    naming_config_path: String,
 }
 
 impl KafkaStreamJob {
@@ -76,6 +77,7 @@ impl KafkaStreamJob {
         sink_conf_url: String,
         url_rule_conf_url: String,
         ip_mapping_url: String,
+        naming_config_path: String,
     ) -> Self {
         KafkaStreamJob {
             application_name,
@@ -87,6 +89,7 @@ impl KafkaStreamJob {
             sink_conf_url,
             url_rule_conf_url,
             ip_mapping_url,
+            naming_config_path,
         }
     }
 }
@@ -100,6 +103,7 @@ impl StreamApp for KafkaStreamJob {
 
         properties.set_str("url_rule_conf_url", self.url_rule_conf_url.as_str());
         properties.set_str("ip_mapping_url", self.ip_mapping_url.as_str());
+        properties.set_str("naming_config_path", self.naming_config_path.as_str());
 
         let checkpoint_endpoint;
         let checkpoint_table;
@@ -142,6 +146,7 @@ impl StreamApp for KafkaStreamJob {
 
         let url_rule_conf_url = properties.get_string("url_rule_conf_url").unwrap();
         let ip_mapping_url = properties.get_string("ip_mapping_url").unwrap();
+        let naming_config_path = properties.get_string("naming_config_path").unwrap();
 
         let kafka_servers_source = properties
             .get_string("kafka_broker_servers_source")
@@ -170,6 +175,7 @@ impl StreamApp for KafkaStreamJob {
             index::is_rule,
             index::upstream_name,
             index::data_source,
+            index::app_uk_parse_type,
         ];
         let key_selector = SchemaBaseKeySelector::new(key_columns, &FIELD_TYPE);
 
@@ -245,7 +251,7 @@ impl StreamApp for KafkaStreamJob {
 
         let data_stream = env
             .register_source(kafka_input_format, source_parallelism as u16)
-            .flat_map(TlbKafkaMapFunction::new(url_rule_conf_url, ip_mapping_url))
+            .flat_map(TlbKafkaMapFunction::new(url_rule_conf_url, ip_mapping_url, naming_config_path))
             .assign_timestamps_and_watermarks(BoundedOutOfOrdernessTimestampExtractor::new(
                 Duration::from_secs(30),
                 SchemaBaseTimestampAssigner::new(index::timestamp, &FIELD_TYPE),

@@ -49,7 +49,7 @@ impl FlatMapFunction for KafkaOutputMapFunction {
         let window = record.trigger_window().unwrap();
         let mut reader = record.as_reader(self.data_type.as_slice());
 
-        let percentile_buffer = reader.get_bytes_mut(49).unwrap();
+        let percentile_buffer = reader.get_bytes_mut(50).unwrap();
         let percentile = Percentile::new(self.scala, percentile_buffer);
         let pct_99 = percentile.get_result(99) as u64;
         let pct_90 = percentile.get_result(90) as u64;
@@ -70,42 +70,43 @@ impl FlatMapFunction for KafkaOutputMapFunction {
             is_rule: reader.get_bool(10).unwrap(),
             upstream_name: reader.get_str(11).unwrap(),
             data_source: reader.get_str(12).unwrap(),
-            bytes_recv_sum: reader.get_i64(13).unwrap(),
-            bytes_recv_1k: reader.get_i64(14).unwrap(),
-            bytes_recv_4k: reader.get_i64(15).unwrap(),
-            bytes_recv_16k: reader.get_i64(16).unwrap(),
-            bytes_recv_64k: reader.get_i64(17).unwrap(),
-            bytes_recv_256k: reader.get_i64(18).unwrap(),
-            bytes_recv_1m: reader.get_i64(19).unwrap(),
-            bytes_recv_3m: reader.get_i64(20).unwrap(),
-            bytes_recv_more: reader.get_i64(21).unwrap(),
-            bytes_send_sum: reader.get_i64(22).unwrap(),
-            bytes_send_1k: reader.get_i64(23).unwrap(),
-            bytes_send_4k: reader.get_i64(24).unwrap(),
-            bytes_send_16k: reader.get_i64(25).unwrap(),
-            bytes_send_64k: reader.get_i64(26).unwrap(),
-            bytes_send_256k: reader.get_i64(27).unwrap(),
-            bytes_send_1m: reader.get_i64(28).unwrap(),
-            bytes_send_3m: reader.get_i64(29).unwrap(),
-            bytes_send_more: reader.get_i64(30).unwrap(),
-            sum_request_time: reader.get_i64(31).unwrap(),
-            sum_response_time: reader.get_i64(32).unwrap(),
-            count_100ms: reader.get_i64(33).unwrap(),
-            count_300ms: reader.get_i64(34).unwrap(),
-            count_500ms: reader.get_i64(35).unwrap(),
-            count_1s: reader.get_i64(36).unwrap(),
-            count_3s: reader.get_i64(37).unwrap(),
-            count_5s: reader.get_i64(38).unwrap(),
-            count_slow: reader.get_i64(39).unwrap(),
-            sum_2xx: reader.get_i64(40).unwrap(),
-            sum_3xx: reader.get_i64(41).unwrap(),
-            sum_4xx: reader.get_i64(42).unwrap(),
-            sum_5xx: reader.get_i64(43).unwrap(),
-            time_2xx: reader.get_i64(44).unwrap(),
-            time_3xx: reader.get_i64(45).unwrap(),
-            time_4xx: reader.get_i64(46).unwrap(),
-            time_5xx: reader.get_i64(47).unwrap(),
-            count: reader.get_i64(48).unwrap(),
+            app_uk_parse_type: reader.get_str(13).unwrap(),
+            bytes_recv_sum: reader.get_i64(14).unwrap(),
+            bytes_recv_1k: reader.get_i64(15).unwrap(),
+            bytes_recv_4k: reader.get_i64(16).unwrap(),
+            bytes_recv_16k: reader.get_i64(17).unwrap(),
+            bytes_recv_64k: reader.get_i64(18).unwrap(),
+            bytes_recv_256k: reader.get_i64(19).unwrap(),
+            bytes_recv_1m: reader.get_i64(20).unwrap(),
+            bytes_recv_3m: reader.get_i64(21).unwrap(),
+            bytes_recv_more: reader.get_i64(22).unwrap(),
+            bytes_send_sum: reader.get_i64(23).unwrap(),
+            bytes_send_1k: reader.get_i64(24).unwrap(),
+            bytes_send_4k: reader.get_i64(25).unwrap(),
+            bytes_send_16k: reader.get_i64(26).unwrap(),
+            bytes_send_64k: reader.get_i64(27).unwrap(),
+            bytes_send_256k: reader.get_i64(28).unwrap(),
+            bytes_send_1m: reader.get_i64(29).unwrap(),
+            bytes_send_3m: reader.get_i64(30).unwrap(),
+            bytes_send_more: reader.get_i64(31).unwrap(),
+            sum_request_time: reader.get_i64(32).unwrap(),
+            sum_response_time: reader.get_i64(33).unwrap(),
+            count_100ms: reader.get_i64(34).unwrap(),
+            count_300ms: reader.get_i64(35).unwrap(),
+            count_500ms: reader.get_i64(36).unwrap(),
+            count_1s: reader.get_i64(37).unwrap(),
+            count_3s: reader.get_i64(38).unwrap(),
+            count_5s: reader.get_i64(39).unwrap(),
+            count_slow: reader.get_i64(40).unwrap(),
+            sum_2xx: reader.get_i64(41).unwrap(),
+            sum_3xx: reader.get_i64(42).unwrap(),
+            sum_4xx: reader.get_i64(43).unwrap(),
+            sum_5xx: reader.get_i64(44).unwrap(),
+            time_2xx: reader.get_i64(45).unwrap(),
+            time_3xx: reader.get_i64(46).unwrap(),
+            time_4xx: reader.get_i64(47).unwrap(),
+            time_5xx: reader.get_i64(48).unwrap(),
+            count: reader.get_i64(49).unwrap(),
             request_time_pct_99: pct_99,
             request_time_pct_90: pct_90,
         };
@@ -115,7 +116,7 @@ impl FlatMapFunction for KafkaOutputMapFunction {
         expression_param.insert("timestamp".to_string(), data.timestamp.to_string());
         let sink_topic = get_sink_topic(expression_param);
 
-        // info!("==>:{}", json);
+        info!("==>:{}", json);
 
         if self.counter & 1048575 == 1 {
             info!(
@@ -192,6 +193,9 @@ pub struct SinkDataModel {
 
     #[serde(rename = "data_source")]
     data_source: String,
+
+    #[serde(rename = "app_uk_parse_type")]
+    app_uk_parse_type: String,
 
     #[serde(rename = "bytes_recv_sum")]
     bytes_recv_sum: i64,

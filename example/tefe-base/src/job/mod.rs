@@ -172,6 +172,7 @@ impl StreamApp for KafkaStreamJob {
             index::is_rule,
             index::upstream_name,
             index::data_source,
+            index::app_uk_parse_type,
         ];
         let key_selector = SchemaBaseKeySelector::new(
             key_columns,

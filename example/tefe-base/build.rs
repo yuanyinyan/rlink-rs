@@ -16,6 +16,7 @@ fn main() {
         .field("is_rule", BOOL)
         .field("upstream_name", STRING)
         .field("data_source", STRING)
+        .field("app_uk_parse_type", STRING)
         .field("bytes_recv_sum", I64)
         .field("bytes_recv_1k", I64)
         .field("bytes_recv_4k", I64)
