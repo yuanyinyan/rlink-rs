@@ -47,7 +47,7 @@ fn main() {
     );
 
     let ip_mapping_url = parse_arg("ip_mapping_url")
-        .unwrap_or("http://ipappukmapping.qa.17usoft.com/mapping/all".to_string());
+        .unwrap_or("http://ipappukmapping.17usoft.com/mapping/all".to_string());
 
     let naming_config_path = parse_arg("naming_config_path")
         .unwrap_or("/Users/yuanyin/Documents/tlb/namingtotal".to_string()).to_string();
