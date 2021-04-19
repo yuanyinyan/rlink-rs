@@ -1,6 +1,6 @@
 use crate::job::ck_converter::TlbClickhouseConverter;
 use crate::job::map_input::TlbKafkaMapFunction;
-use rlink::api::backend::{CheckpointBackend, KeyedStateBackend};
+use rlink::api::backend::{/*CheckpointBackend, */KeyedStateBackend};
 use rlink::api::data_stream::TDataStream;
 use rlink::api::env::{StreamApp, StreamExecutionEnvironment};
 use rlink::api::properties::{Properties, SystemProperties};
@@ -20,15 +20,15 @@ const KAFKA_BROKERS_PRODUCT_SOURCE: &str = "kafka.ops.17usoft.com:9092";
 
 const CK_ADDRESS_QA_SINK: &str = "";
 const CK_ADDRESS_PRODUCT_SINK: &str =
-    "tcp://172.20.201.84:9000,tcp://172.20.78.6:9000,tcp://172.20.201.85:9000,tcp://172.20.78.30:9000,tcp://172.20.78.22:9000,tcp://172.20.78.3:9000,tcp://172.20.78.33:9000,tcp://172.20.77.219:9000,tcp://172.20.78.204:9000";
+    "tcp://172.20.77.219:9000,tcp://172.20.78.204:9000,tcp://172.20.201.84:9000,tcp://172.20.78.6:9000,tcp://172.20.201.85:9000,tcp://172.20.78.30:9000,tcp://172.20.78.22:9000,tcp://172.20.78.3:9000,tcp://172.20.78.33:9000";
 const CK_TABLE_NAME_QA: &str = "";
 const CK_TABLE_NAME_PRODUCT: &str = "tlb.access_log_all";
 
-const CHECKPOINT_ENDPOINT_QA: &str =
-    "mysql://teinfra_dss_streaming:bxwFBUCgb9ipV1qSaDDV@10.100.38.206:3044/teinfra_dss_streaming";
-const CHECKPOINT_TABLE_QA: &str = "checkpoint";
-const CHECKPOINT_ENDPOINT_PRODUCT: &str = "mysql://teinfra_dss_streaming:c5mCEcWTztcZp5tDWkJ05z@database-mysql.cdb.17usoft.com:3234/teinfra_dss_streaming";
-const CHECKPOINT_TABLE_PRODUCT: &str = "checkpoint";
+// const CHECKPOINT_ENDPOINT_QA: &str =
+//     "mysql://teinfra_dss_streaming:bxwFBUCgb9ipV1qSaDDV@10.100.38.206:3044/teinfra_dss_streaming";
+// const CHECKPOINT_TABLE_QA: &str = "checkpoint";
+// const CHECKPOINT_ENDPOINT_PRODUCT: &str = "mysql://teinfra_dss_streaming:c5mCEcWTztcZp5tDWkJ05z@database-mysql.cdb.17usoft.com:3234/teinfra_dss_streaming";
+// const CHECKPOINT_TABLE_PRODUCT: &str = "checkpoint";
 
 #[derive(Clone, Debug)]
 pub struct KafkaStreamJob {
@@ -55,30 +55,30 @@ impl StreamApp for KafkaStreamJob {
         properties.set_str("kafka_group_id", "tlb_consumer_group_rust_detail");
         properties.set_u32("source_parallelism", self.source_parallelism);
 
-        let checkpoint_endpoint;
-        let checkpoint_table;
+        // let checkpoint_endpoint;
+        // let checkpoint_table;
         if self.env.eq("product") {
             properties.set_str("kafka_topic_source", KAFKA_TOPIC_PRODUCT_SOURCE);
             properties.set_str("kafka_broker_servers_source", KAFKA_BROKERS_PRODUCT_SOURCE);
             properties.set_str("ck_address", CK_ADDRESS_PRODUCT_SINK);
             properties.set_str("ck_table_name", CK_TABLE_NAME_PRODUCT);
-            checkpoint_endpoint = CHECKPOINT_ENDPOINT_PRODUCT;
-            checkpoint_table = CHECKPOINT_TABLE_PRODUCT;
+            // checkpoint_endpoint = CHECKPOINT_ENDPOINT_PRODUCT;
+            // checkpoint_table = CHECKPOINT_TABLE_PRODUCT;
         } else {
             properties.set_str("kafka_topic_source", KAFKA_TOPIC_QA_SOURCE);
             properties.set_str("kafka_broker_servers_source", KAFKA_BROKERS_QA_SOURCE);
             properties.set_str("ck_address", CK_ADDRESS_QA_SINK);
             properties.set_str("ck_table_name", CK_TABLE_NAME_QA);
-            checkpoint_endpoint = CHECKPOINT_ENDPOINT_QA;
-            checkpoint_table = CHECKPOINT_TABLE_QA;
+            // checkpoint_endpoint = CHECKPOINT_ENDPOINT_QA;
+            // checkpoint_table = CHECKPOINT_TABLE_QA;
         };
 
         properties.set_str("kafka_topic_source", self.topic.as_str());
 
-        properties.set_checkpoint(CheckpointBackend::MySql {
-            endpoint: checkpoint_endpoint.to_string(),
-            table: Some(checkpoint_table.to_string()),
-        });
+        // properties.set_checkpoint(CheckpointBackend::MySql {
+        //     endpoint: checkpoint_endpoint.to_string(),
+        //     table: Some(checkpoint_table.to_string()),
+        // });
     }
 
     fn build_stream(&self, properties: &Properties, env: &mut StreamExecutionEnvironment) {
