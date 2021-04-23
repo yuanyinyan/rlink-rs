@@ -109,7 +109,7 @@ impl StreamApp for KafkaStreamJob {
         let ck_output_format = ClickhouseSink::new(
             ck_addr.as_str(),
             ck_table_name.as_str(),
-            1000_000,
+            300_000,
             Duration::from_secs(60),
             1,
             converter,
