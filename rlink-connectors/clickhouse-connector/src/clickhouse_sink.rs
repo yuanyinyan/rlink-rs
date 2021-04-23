@@ -163,6 +163,7 @@ impl ClickhouseSinkTask {
                     if len == 0 {
                         async_sleep(Duration::from_secs(1)).await;
                     }
+                    info!("==>write clickhouse size={}", len)
                 }
                 Err(e) => {
                     error!("write clickhouse error. {}", e);
