@@ -139,8 +139,8 @@ fn parse_data(naming_map: &HashMap<String, Vec<String>>, line: &str) -> Result<R
         return Err(Box::try_from("st format error").unwrap());
     }
 
-    let (client_info, _) = parse_ip_mapping(client_ip.as_str(), "")?;
-    let (sever_info, app_uk_parse_type) = parse_ip_mapping(server_ip.as_str(), sever_port)?;
+    let (client_info, _) = parse_ip_mapping(client_ip.as_str(), "", true)?;
+    let (sever_info, app_uk_parse_type) = parse_ip_mapping(server_ip.as_str(), sever_port, false)?;
     let (app_id, region, env, logical_idc) = parse_upstream_name(naming_map, upstream_name.as_str());
 
     let (request_uri, is_rule) = format_url(
@@ -174,7 +174,7 @@ fn parse_data(naming_map: &HashMap<String, Vec<String>>, line: &str) -> Result<R
     let entity = Entity {
         timestamp,
         app_id: sever_info.app_uk.unwrap_or(app_id.clone()),
-        client_app_uk: client_info.app_uk.unwrap_or_default(),
+        client_app_uk: client_info.app_uk.unwrap_or(client_ip),
         region: sever_info.area_uk.unwrap_or(region.clone()),
         env: sever_info.group_environment.unwrap_or(env.clone()),
         logical_idc: sever_info.logical_idc_uk.unwrap_or(logical_idc.clone()),
@@ -240,12 +240,20 @@ fn parse_st(st: &str) -> Result<u64, Box<dyn Error>> {
     Ok(timestamp as u64)
 }
 
-fn parse_ip_mapping(ip: &str, port: &str) -> Result<(IpMappingItem, AppUkParseType), Box<dyn Error>> {
+fn parse_ip_mapping(ip: &str, port: &str, is_client: bool) -> Result<(IpMappingItem, AppUkParseType), Box<dyn Error>> {
     if ip.is_empty() {
         return Ok((IpMappingItem::new(), AppUkParseType::UpstreamName));
     }
     let ip_mapping_items = get_ip_mapping_config(ip);
-    if ip_mapping_items.len() == 1 || port.is_empty() {
+    if is_client {
+        return if ip_mapping_items.len() == 1 {
+            let item = ip_mapping_items.get(0).unwrap_or(&IpMappingItem::new()).to_owned();
+            Ok((item, AppUkParseType::PrimaryIp))
+        } else {
+            Ok((IpMappingItem::new(), AppUkParseType::UpstreamName))
+        }
+    }
+    if ip_mapping_items.len() == 1 {
         for item in ip_mapping_items {
             if item.primary_ip.clone().unwrap_or_default().eq(ip) {
                 return Ok((item, AppUkParseType::PrimaryIp));
